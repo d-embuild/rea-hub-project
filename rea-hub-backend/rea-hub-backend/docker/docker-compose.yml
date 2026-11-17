@@ -1,0 +1,26 @@
+# Only Nginx is published. The API has NO published ports and sits on an internal bridge.
+# The database is managed Supabase Postgres (not a container), reachable only from the API using DATABASE_URL.
+services:
+  api:
+    build: { context: .., dockerfile: Dockerfile }
+    env_file: ../.env
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy.inc:/etc/nginx/proxy.inc:ro
+      - ./certs:/etc/nginx/certs:ro        # fullchain.pem + privkey.pem (e.g. from Let's Encrypt)
+    depends_on: [api]
+    networks: [edge, backend]
+
+networks:
+  edge: {}
+  backend: { driver: bridge, internal: false }   # API needs outbound access to Supabase/R2; nothing inbound is published
